@@ -123,11 +123,11 @@ tripsRouter.post('/', requireRoles(...WRITE_ROLES), async (req, res, next) => {
 tripsRouter.post('/:id/dispatch', requireRoles(...WRITE_ROLES), async (req, res, next) => {
   try {
     const trip = await withTransaction(async (tx) => {
-      const { rows: trips } = await tx.query('SELECT * FROM trips WHERE id = $1', [req.params.id]);
+      const { rows: trips } = await tx.query('SELECT * FROM trips WHERE id = $1 FOR UPDATE', [req.params.id]);
       const tripRow = trips[0];
       if (!tripRow) throw notFound('Trip not found');
-      const { rows: vehicles } = await tx.query('SELECT * FROM vehicles WHERE id = $1', [tripRow.vehicle_id]);
-      const { rows: drivers } = await tx.query('SELECT * FROM drivers WHERE id = $1', [tripRow.driver_id]);
+      const { rows: vehicles } = await tx.query('SELECT * FROM vehicles WHERE id = $1 FOR UPDATE', [tripRow.vehicle_id]);
+      const { rows: drivers } = await tx.query('SELECT * FROM drivers WHERE id = $1 FOR UPDATE', [tripRow.driver_id]);
       if (!vehicles[0]) throw notFound('Vehicle not found');
       if (!drivers[0]) throw notFound('Driver not found');
 
@@ -153,7 +153,7 @@ tripsRouter.post('/:id/complete', requireRoles(...WRITE_ROLES), async (req, res,
       revenue: { type: 'number', min: 0 },
     });
     const trip = await withTransaction(async (tx) => {
-      const { rows: trips } = await tx.query('SELECT * FROM trips WHERE id = $1', [req.params.id]);
+      const { rows: trips } = await tx.query('SELECT * FROM trips WHERE id = $1 FOR UPDATE', [req.params.id]);
       const tripRow = trips[0];
       if (!tripRow) throw notFound('Trip not found');
       if (tripRow.status !== 'DISPATCHED') {
@@ -181,7 +181,7 @@ tripsRouter.post('/:id/complete', requireRoles(...WRITE_ROLES), async (req, res,
 tripsRouter.post('/:id/cancel', requireRoles(...WRITE_ROLES), async (req, res, next) => {
   try {
     const trip = await withTransaction(async (tx) => {
-      const { rows: trips } = await tx.query('SELECT * FROM trips WHERE id = $1', [req.params.id]);
+      const { rows: trips } = await tx.query('SELECT * FROM trips WHERE id = $1 FOR UPDATE', [req.params.id]);
       const tripRow = trips[0];
       if (!tripRow) throw notFound('Trip not found');
       if (tripRow.status === 'COMPLETED' || tripRow.status === 'CANCELLED') {

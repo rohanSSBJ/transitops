@@ -62,7 +62,7 @@ maintenanceRouter.post('/', requireRoles('FLEET_MANAGER'), async (req, res, next
       notes: { type: 'string' },
     });
     const log = await withTransaction(async (tx) => {
-      const { rows: vehicles } = await tx.query('SELECT * FROM vehicles WHERE id = $1', [dto.vehicleId]);
+      const { rows: vehicles } = await tx.query('SELECT * FROM vehicles WHERE id = $1 FOR UPDATE', [dto.vehicleId]);
       const vehicle = vehicles[0];
       if (!vehicle) throw notFound('Vehicle not found');
       if (vehicle.status === 'ON_TRIP') {
@@ -92,7 +92,7 @@ maintenanceRouter.post('/:id/close', requireRoles('FLEET_MANAGER'), async (req, 
       notes: { type: 'string' },
     });
     const updated = await withTransaction(async (tx) => {
-      const { rows: logs } = await tx.query('SELECT * FROM maintenance_logs WHERE id = $1', [req.params.id]);
+      const { rows: logs } = await tx.query('SELECT * FROM maintenance_logs WHERE id = $1 FOR UPDATE', [req.params.id]);
       const log = logs[0];
       if (!log) throw notFound('Maintenance record not found');
       if (!log.is_open) {
@@ -104,10 +104,11 @@ maintenanceRouter.post('/:id/close', requireRoles('FLEET_MANAGER'), async (req, 
          WHERE id = $3 RETURNING *`,
         [dto.cost ?? log.cost, dto.notes ?? log.notes, req.params.id],
       );
-      const { rows: vehicles } = await tx.query('SELECT * FROM vehicles WHERE id = $1', [log.vehicle_id]);
+      const { rows: vehicles } = await tx.query('SELECT * FROM vehicles WHERE id = $1 FOR UPDATE', [log.vehicle_id]);
       const vehicle = vehicles[0];
       // Do not resurrect a retired vehicle.
-      if (vehicle && vehicle.status !== 'RETIRED') {
+      const { rows: open } = await tx.query('SELECT COUNT(*)::int AS count FROM maintenance_logs WHERE vehicle_id = $1 AND is_open = true', [log.vehicle_id]);
+      if (vehicle && vehicle.status !== 'RETIRED' && open[0].count === 0) {
         await tx.query(`UPDATE vehicles SET status = 'AVAILABLE' WHERE id = $1`, [log.vehicle_id]);
       }
       return rows[0];

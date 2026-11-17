@@ -163,10 +163,11 @@ plus endpoint-specific filters. Responses are
 - driver license must not be expired
 - cargo weight must not exceed vehicle max load
 
-Dispatch/complete/cancel group their writes inside SQL transactions.
+Dispatch/complete/cancel group their writes inside SQL transactions. Row locks
+serialize conflicting trip and maintenance transitions.
 
 **Maintenance side effects**: opening a record flips the vehicle to IN_SHOP
-(rejected for ON_TRIP or RETIRED vehicles); closing restores AVAILABLE unless
+(rejected for ON_TRIP or RETIRED vehicles); closing the final open record restores AVAILABLE unless
 the vehicle is RETIRED.
 
 ---
@@ -223,3 +224,12 @@ error shapes. `server/test/rate-limit.test.js` covers the login throttle.
 cd server
 TEST_DATABASE_URL=postgresql://user:pass@host:5432/transitops_test npm test
 ```
+
+Tests require a disposable database named with an `_test` suffix. They delete its
+application data. Never point test setup or the demo seed at production data.
+
+## Verification scope
+
+The integration suite exercises the rewritten API against a local PostgreSQL
+database. The original deployment was not contacted, and full production
+behavior parity has not been established. Review deployment settings before use.
